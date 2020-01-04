@@ -40,7 +40,7 @@ cross compiled binary as simple systemd service into your Raspberry Pi like this
 
 ```shell
 # Upload systemd unit file:
-$ scp fritz-mon.service raspberry:/etc/systemd/system/fritz-mon.service
+$ scp systemd/fritz-mon.service raspberry:/etc/systemd/system/fritz-mon.service
 
 # Log into your Pi:
 $ ssh raspberry
