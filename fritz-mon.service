@@ -1,0 +1,11 @@
+[Unit]
+Description=FRITZ!Box Monitoring Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/fritz-mon -config=/etc/fritz-mon.yml
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

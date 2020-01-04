@@ -2,8 +2,6 @@ package main
 
 import (
 	"flag"
-	"os"
-	"path/filepath"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
@@ -11,11 +9,17 @@ import (
 )
 
 func main() {
+	setup := flag.Bool("setup", false, "setup configuration file interactively")
 	verbose := flag.Bool("debug", false, "enable verbose log output")
-	config := flag.String("config", filepath.Join(os.Getenv("HOME"), ".fritz-mon.yml"), "path to the configuration file")
+	config := flag.String("config", "fritz-mon.yml", "path to the configuration file")
 	flag.Parse()
 
-	logger := NewLogger(*verbose)
+	if *setup {
+		runSetup()
+		return
+	}
+
+	logger := newLogger(*verbose)
 	conf, err := LoadConfiguration(*config, logger)
 	if err != nil {
 		logger.Fatal("Failed to load configuration", zap.Error(err))
@@ -39,7 +43,7 @@ func main() {
 	logger.Info(`Shutdown complete. Have a nice day  \ʕ◔ϖ◔ʔ/`)
 }
 
-func NewLogger(verbose bool) *zap.Logger {
+func newLogger(verbose bool) *zap.Logger {
 	level := zap.InfoLevel
 	if verbose {
 		level = zap.DebugLevel

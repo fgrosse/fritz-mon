@@ -1,3 +1,4 @@
 grafana
 prometheus
-config.yml
+fritz-mon.yml
+fritz-mon

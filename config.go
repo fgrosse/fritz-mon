@@ -21,9 +21,9 @@ type Config struct {
 }
 
 func LoadConfiguration(path string, logger *zap.Logger) (Config, error) {
-	var conf Config
-
 	logger.Info("Loading configuration file", zap.String("path", path))
+
+	conf := DefaultConfig()
 	f, err := os.Open(path)
 	if err != nil {
 		return conf, fmt.Errorf("failed to open config file %w", err)
@@ -31,11 +31,6 @@ func LoadConfiguration(path string, logger *zap.Logger) (Config, error) {
 
 	dec := yaml.NewDecoder(f)
 	dec.SetStrict(true)
-
-	// Setup some default values.
-	conf.ListenAddr = "localhost:4000"
-	conf.MonitoringInterval = 5 * time.Minute
-	conf.FritzBox.BaseURL = "http://fritz.box"
 
 	err = dec.Decode(&conf)
 	_ = f.Close()
@@ -49,6 +44,14 @@ func LoadConfiguration(path string, logger *zap.Logger) (Config, error) {
 	}
 
 	return conf, nil
+}
+
+func DefaultConfig() Config {
+	var conf Config
+	conf.ListenAddr = "0:0:0:0:3000"
+	conf.MonitoringInterval = 5 * time.Minute
+	conf.FritzBox.BaseURL = "http://fritz.box"
+	return conf
 }
 
 func (c Config) Validate() error {

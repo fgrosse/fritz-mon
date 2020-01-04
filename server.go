@@ -54,13 +54,14 @@ func (s *Server) Run() error {
 		zap.Duration("monitoring_interval", s.Config.MonitoringInterval),
 	)
 
+	s.Logger.Info("If you want to see more verbose log run with -debug")
+
 	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler()) // TODO: use passed registry
+	mux.Handle("/metrics", promhttp.Handler())
 
 	httpServer := &http.Server{
 		Addr:    s.Config.ListenAddr,
 		Handler: mux,
-		// TODO: ErrorLog: log.NewStdLog(logger.Named("http")),
 	}
 
 	httpServerErr := make(chan error, 1)
