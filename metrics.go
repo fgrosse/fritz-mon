@@ -11,8 +11,8 @@ import (
 
 type Metrics struct {
 	IsConnected *prometheus.GaugeVec
-	Temperature *prometheus.GaugeVec
 	IsPoweredOn *prometheus.GaugeVec
+	Temperature *prometheus.GaugeVec
 	Power       *prometheus.GaugeVec
 	Voltage     *prometheus.GaugeVec
 	Energy      *prometheus.GaugeVec
@@ -39,21 +39,21 @@ func NewMetrics(logger *zap.Logger) *Metrics {
 			},
 			labelNames,
 		),
-		Temperature: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Namespace: namespace,
-				Subsystem: subsystem,
-				Name:      "temperature_celsius",
-				Help:      "Temperature measured at the device sensor in degree Celsius.",
-			},
-			labelNames,
-		),
 		IsPoweredOn: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: namespace,
 				Subsystem: subsystem,
 				Name:      "is_powered_bool",
 				Help:      "Either 0 or 1 to indicate if the device is powered on or off.",
+			},
+			labelNames,
+		),
+		Temperature: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Subsystem: subsystem,
+				Name:      "temperature_celsius",
+				Help:      "Temperature measured at the device sensor in degree Celsius.",
 			},
 			labelNames,
 		),
@@ -89,6 +89,8 @@ func NewMetrics(logger *zap.Logger) *Metrics {
 
 func (m *Metrics) Register(r prometheus.Registerer) error {
 	metrics := []prometheus.Collector{
+		m.IsPoweredOn,
+		m.IsConnected,
 		m.Temperature,
 		m.Power,
 		m.Voltage,

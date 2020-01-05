@@ -15,7 +15,9 @@ fritz-mon                                                    100% 12MB   9.4MB/s
 # Log into your Pi:
 $ ssh raspberry
 
-# TODO: configure it
+# Setup initial configuration (requires existing user at FRITZ!Box)
+fritz-mon -setup
+…
 
 # Run it:
 $ fritz-mon -config=/etc/fritz-mon.yml -debug
@@ -28,15 +30,32 @@ $ fritz-mon -config=/etc/fritz-mon.yml -debug
 …
 ```
 
-### Why?
+### Collected Metrics
 
-Node exporter apparently doesn't track this metric and this was super easy to do by myself.
+Currently, the following metrics are collected:
+
+| Name                                              | Description                                                                      |
+|---------------------------------------------------|----------------------------------------------------------------------------------|
+| `fritzbox_home_automation_device_connected_bool`  | Either 0 or 1 to indicate if the device is currently connected to the FRITZ!Box. |
+| `fritzbox_home_automation_is_powered_bool`        | Either 0 or 1 to indicate if the device is powered on or off.                    |
+| `fritzbox_home_automation_temperature_celsius`    | Temperature measured at the device sensor in degree Celsius.                     |
+| `fritzbox_home_automation_power_watts`            | Electric power in Watt.                                                          |
+| `fritzbox_home_automation_voltage_volts`          | Electric voltage in Volt.                                                        |
+| `fritzbox_home_automation_energy_watthours_total` | Accumulated power consumption in Watt hours since initial setup.                 |
+
+#### Notes
+
+All metrics are collected with a `device_name` label. The FRITZ!Box and their
+devices refresh some of the metrics only about every 2 minutes so it does not
+make a lot of sense setting a more granular scraping interval in Prometheus for
+this service. 
 
 ### Systemd
 
 Once you get the program working you can set it up in a more permanent way by
-using the provided [`fritz-mon.service`](fritz-mon.service) file to install the
-cross compiled binary as simple systemd service into your Raspberry Pi like this:
+using the provided [`systemd/fritz-mon.service`](systemd/fritz-mon.service) file
+to install the cross compiled binary as simple systemd service into your
+Raspberry Pi like this:
 
 ```shell
 # Upload systemd unit file:
@@ -66,6 +85,8 @@ Jan 04 19:47:14 fritz-mon[28951]: 2020-01-04T19:47:14.978+0100        INFO      
 Jan 04 19:47:14 fritz-mon[28951]: 2020-01-04T19:47:14.988+0100        INFO        Starting FRITZ!Box monitoring server        {"listen_addr": "localhost:3000", "fritzbox": "http://fritz.box", "monitoring_interval": "5m0s"}
 Jan 04 19:47:14 fritz-mon[28951]: 2020-01-04T19:47:14.990+0100        INFO        If you want to see more verbose log run with -debug
 ```
+
+There are also some additional systemd unit files to setup Grafana and Prometheus.
 
 ### License
 
