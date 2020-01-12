@@ -1,6 +1,7 @@
 package fritzbox
 
 import (
+	"context"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -23,7 +24,7 @@ type Permissions struct {
 // invalid or "no session".
 const zeroSessionID = "0000000000000000"
 
-func (c *Client) getSession() (string, error) {
+func (c *Client) getSession(ctx context.Context) (string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -31,7 +32,7 @@ func (c *Client) getSession() (string, error) {
 		return c.session.SID, nil
 	}
 
-	err := c.getXML(&c.session, "/login_sid.lua", "sid", c.session.SID)
+	err := c.getXML(ctx, &c.session, "/login_sid.lua", "sid", c.session.SID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get login challenge: %w", err)
 	}
@@ -42,7 +43,7 @@ func (c *Client) getSession() (string, error) {
 
 	c.logger.Debug("Authenticating new session at FRITZ!Box API", zap.String("base_url", c.BaseURL.String()))
 	challengeResponse := c.session.solveChallenge(c.Password)
-	err = c.getXML(&c.session, "/login_sid.lua",
+	err = c.getXML(ctx, &c.session, "/login_sid.lua",
 		"response", challengeResponse,
 		"username", c.Username,
 	)
@@ -62,7 +63,7 @@ func (s Session) solveChallenge(password string) string {
 	return s.Challenge + "-" + toUTF16andMD5(challengeAndPassword)
 }
 
-func (c *Client) logout() error {
+func (c *Client) logout(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -71,6 +72,6 @@ func (c *Client) logout() error {
 	}
 
 	c.logger.Debug("Logging out from FRITZ!Box API")
-	_, err := c.get("/login_sid.lua", "sid", c.session.SID, "logout", "true")
+	_, err := c.get(ctx, "/login_sid.lua", "sid", c.session.SID, "logout", "true")
 	return err
 }

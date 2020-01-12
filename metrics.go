@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"sort"
 
@@ -237,10 +238,10 @@ func (m *NetworkMetrics) Register(r prometheus.Registerer) error {
 	return nil
 }
 
-func (m *DeviceMetrics) FetchFrom(client *fritzbox.Client) error {
+func (m *DeviceMetrics) FetchFrom(ctx context.Context, client *fritzbox.Client) error {
 	m.logger.Debug("Fetching device metrics from FRITZ!Box API")
 
-	devices, err := client.Devices()
+	devices, err := client.Devices(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to fetch devices from the FRITZ!Box API: %w", err)
 	}
@@ -288,10 +289,10 @@ func (m *DeviceMetrics) collectDeviceMetrics(device fritzbox.Device) {
 	m.logger.Debug("Collected device metrics", logFields...)
 }
 
-func (m *NetworkMetrics) FetchFrom(client *fritzbox.Client) error {
+func (m *NetworkMetrics) FetchFrom(ctx context.Context, client *fritzbox.Client) error {
 	m.logger.Debug("Fetching network metrics from FRITZ!Box API")
 
-	stats, err := client.NetworkStats()
+	stats, err := client.NetworkStats(ctx)
 	if err != nil {
 		return err
 	}

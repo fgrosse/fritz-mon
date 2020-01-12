@@ -1,9 +1,9 @@
 package fritzbox
 
 import (
+	"context"
 	"encoding/json"
-
-	"github.com/pkg/errors"
+	"fmt"
 )
 
 // 20 values representing the last 100 seconds in 20 buckets of 5 seconds each.
@@ -18,13 +18,13 @@ type TrafficMonitoringData struct {
 	UpstreamGuest           []float64 `json:"guest_us_bps"`
 }
 
-func (c *Client) NetworkStats() (*TrafficMonitoringData, error) {
-	sessionID, err := c.getSession()
+func (c *Client) NetworkStats(ctx context.Context) (*TrafficMonitoringData, error) {
+	sessionID, err := c.getSession(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := c.get("/internet/inetstat_monitor.lua",
+	resp, err := c.get(ctx, "/internet/inetstat_monitor.lua",
 		"sid", sessionID,
 		"myXhr", "1",
 		"xhr", "1",
@@ -33,17 +33,17 @@ func (c *Client) NetworkStats() (*TrafficMonitoringData, error) {
 	)
 
 	if err != nil {
-		return nil, errors.Wrap(err, "inetstat_monitor.lua")
+		return nil, fmt.Errorf("inetstat_monitor.lua: %w", err)
 	}
 
 	var result []*TrafficMonitoringData
 	err = json.NewDecoder(resp).Decode(&result)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to decode response as JSON")
+		return nil, fmt.Errorf("failed to decode response as JSON: %w", err)
 	}
 
 	if len(result) == 0 {
-		return nil, errors.Wrap(err, "FRITZ!Box returned no monitoring data")
+		return nil, fmt.Errorf("FRITZ!Box returned no monitoring data: %w", err)
 	}
 
 	return result[0], nil

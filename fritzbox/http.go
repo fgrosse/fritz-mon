@@ -2,6 +2,7 @@ package fritzbox
 
 import (
 	"bytes"
+	"context"
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
@@ -10,8 +11,8 @@ import (
 	"path"
 )
 
-func (c *Client) getXML(target interface{}, reqPath string, args ...string) error {
-	resp, err := c.get(reqPath, args...)
+func (c *Client) getXML(ctx context.Context, target interface{}, reqPath string, args ...string) error {
+	resp, err := c.get(ctx, reqPath, args...)
 	if err != nil {
 		return err
 	}
@@ -24,7 +25,7 @@ func (c *Client) getXML(target interface{}, reqPath string, args ...string) erro
 	return nil
 }
 
-func (c *Client) get(reqPath string, args ...string) (*bytes.Buffer, error) {
+func (c *Client) get(ctx context.Context, reqPath string, args ...string) (*bytes.Buffer, error) {
 	if len(args)%2 != 0 {
 		return nil, fmt.Errorf("bad number of query arguments (must be a factor of 2)")
 	}
@@ -35,11 +36,17 @@ func (c *Client) get(reqPath string, args ...string) (*bytes.Buffer, error) {
 		params.Add(key, val)
 	}
 
-	req := c.BaseURL
-	req.Path = path.Join(c.BaseURL.Path, reqPath)
-	req.RawQuery = params.Encode()
+	reqURL := c.BaseURL
+	reqURL.Path = path.Join(c.BaseURL.Path, reqPath)
+	reqURL.RawQuery = params.Encode()
 
-	resp, err := c.http.Get(req.String())
+	req, err := http.NewRequest("GET", reqURL.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build HTTP request: %w", err)
+	}
+
+	req = req.WithContext(ctx)
+	resp, err := c.http.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP request failed: %w", err)
 	}

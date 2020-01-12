@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/fgrosse/fritz-mon/fritzbox"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
@@ -75,7 +75,7 @@ func (s *Server) Run() error {
 	go func() {
 		err := httpServer.ListenAndServe()
 		if err != http.ErrServerClosed {
-			serverErr = errors.Wrap(err, "HTTP server failed")
+			serverErr = fmt.Errorf("HTTP server failed: %w", err)
 		}
 		shutdown()
 	}()
@@ -153,8 +153,8 @@ func (s *Server) deviceMetricsLoop(ctx context.Context, wg *sync.WaitGroup, inte
 	for {
 		select {
 		case <-ticker:
-			err := s.Metrics.Devices.FetchFrom(s.FritzBox)
-			if err != nil {
+			err := s.Metrics.Devices.FetchFrom(ctx, s.FritzBox)
+			if err != nil && !errors.Is(err, context.Canceled) {
 				s.Logger.Error("Failed to fetch device metrics", zap.Error(err))
 			}
 
@@ -180,8 +180,8 @@ func (s *Server) networkMetricsLoop(ctx context.Context, wg *sync.WaitGroup, int
 			return
 
 		case <-ticker:
-			err := s.Metrics.Network.FetchFrom(s.FritzBox)
-			if err != nil {
+			err := s.Metrics.Network.FetchFrom(ctx, s.FritzBox)
+			if err != nil && !errors.Is(err, context.Canceled) {
 				s.Logger.Error("Failed to fetch network metrics", zap.Error(err))
 			}
 		}
