@@ -293,14 +293,14 @@ func (m *NetworkMetrics) FetchFrom(ctx context.Context, client *fritzbox.Client)
 		return err
 	}
 
-	m.DownstreamInternet.Set(stats.DownstreamInternet[0])
-	m.DownStreamMedia.Set(stats.DownStreamMedia[0])
-	m.DownStreamGuest.Set(stats.DownStreamGuest[0])
-	m.UpstreamRealtime.Set(stats.UpstreamRealtime[0])
-	m.UpstreamHighPriority.Set(stats.UpstreamHighPriority[0])
-	m.UpstreamDefaultPriority.Set(stats.UpstreamDefaultPriority[0])
-	m.UpstreamLowPriority.Set(stats.UpstreamLowPriority[0])
-	m.UpstreamGuest.Set(stats.UpstreamGuest[0])
+	m.DownstreamInternet.Set(stats.DownstreamInternet[0] * 8)
+	m.DownStreamMedia.Set(stats.DownStreamMedia[0] * 8)
+	m.DownStreamGuest.Set(stats.DownStreamGuest[0] * 8)
+	m.UpstreamRealtime.Set(stats.UpstreamRealtime[0] * 8)
+	m.UpstreamHighPriority.Set(stats.UpstreamHighPriority[0] * 8)
+	m.UpstreamDefaultPriority.Set(stats.UpstreamDefaultPriority[0] * 8)
+	m.UpstreamLowPriority.Set(stats.UpstreamLowPriority[0] * 8)
+	m.UpstreamGuest.Set(stats.UpstreamGuest[0] * 8)
 
 	m.logger.Debug("Collected network metrics")
 	return nil

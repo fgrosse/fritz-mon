@@ -7,6 +7,7 @@ import (
 )
 
 // 20 values representing the last 100 seconds in 20 buckets of 5 seconds each.
+// Apparently the values are *Bytes* per second (not bits)
 type TrafficMonitoringData struct {
 	DownstreamInternet      []float64 `json:"ds_bps_curr"`
 	DownStreamMedia         []float64 `json:"ds_mc_bps_curr"`
