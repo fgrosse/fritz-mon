@@ -23,14 +23,21 @@ type Permissions struct {
 // invalid or "no session".
 const zeroSessionID = "0000000000000000"
 
-func (c *Client) login() error {
+func (c *Client) getSession() (string, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.session.SID != "" {
+		return c.session.SID, nil
+	}
+
 	err := c.getXML(&c.session, "/login_sid.lua", "sid", c.session.SID)
 	if err != nil {
-		return fmt.Errorf("failed to get login challenge: %w", err)
+		return "", fmt.Errorf("failed to get login challenge: %w", err)
 	}
 
 	if c.session.SID != zeroSessionID {
-		return nil // session is still valid
+		return "", nil // session is still valid
 	}
 
 	c.logger.Debug("Authenticating new session at FRITZ!Box API", zap.String("base_url", c.BaseURL.String()))
@@ -40,14 +47,14 @@ func (c *Client) login() error {
 		"username", c.Username,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to submit challenge response: %w", err)
+		return "", fmt.Errorf("failed to submit challenge response: %w", err)
 	}
 
 	if c.session.SID == "" || c.session.SID == zeroSessionID {
-		return fmt.Errorf("failed to solve authentication challenge, check username and password")
+		return "", fmt.Errorf("failed to solve authentication challenge, check username and password")
 	}
 
-	return nil
+	return c.session.SID, nil
 }
 
 func (s Session) solveChallenge(password string) string {
@@ -56,6 +63,9 @@ func (s Session) solveChallenge(password string) string {
 }
 
 func (c *Client) logout() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if c.session.SID == "" {
 		return nil // we don't have a session
 	}

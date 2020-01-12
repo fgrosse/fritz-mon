@@ -20,6 +20,8 @@ func main() {
 	}
 
 	logger := newLogger(*verbose)
+	defer func() { _ = logger.Sync() }()
+
 	conf, err := LoadConfiguration(*config, logger)
 	if err != nil {
 		logger.Fatal("Failed to load configuration", zap.Error(err))

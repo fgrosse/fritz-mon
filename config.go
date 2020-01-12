@@ -11,9 +11,10 @@ import (
 )
 
 type Config struct {
-	ListenAddr         string        `yaml:"listen_addr"`         // base URL at which to expose Prometheus metrics
-	MonitoringInterval time.Duration `yaml:"monitoring_interval"` // how often to scrape metrics from the FRITZ!Box API
-	FritzBox           struct {
+	ListenAddr                string        `yaml:"listen_addr"`                 // base URL at which to expose Prometheus metrics
+	DeviceMonitoringInterval  time.Duration `yaml:"device_monitoring_interval"`  // how often to scrape device metrics from the FRITZ!Box API
+	NetworkMonitoringInterval time.Duration `yaml:"network_monitoring_interval"` // how often to scrape network metrics from the FRITZ!Box API
+	FritzBox                  struct {
 		Username string `yaml:"username"`
 		Password string `yaml:"password"`
 		BaseURL  string `yaml:"base_url"`
@@ -49,7 +50,8 @@ func LoadConfiguration(path string, logger *zap.Logger) (Config, error) {
 func DefaultConfig() Config {
 	var conf Config
 	conf.ListenAddr = "0:0:0:0:3000"
-	conf.MonitoringInterval = 5 * time.Minute
+	conf.DeviceMonitoringInterval = 5 * time.Minute
+	conf.NetworkMonitoringInterval = 100 * time.Second // Fritzbox returns the values of the last 100 seconds in 20 buckets of 5 seconds
 	conf.FritzBox.BaseURL = "http://fritz.box"
 	return conf
 }
@@ -66,8 +68,11 @@ func (c Config) Validate() error {
 	if c.FritzBox.Username == "" {
 		err = multierr.Append(err, fmt.Errorf("missing fritzbox.password"))
 	}
-	if c.MonitoringInterval == 0 {
-		err = multierr.Append(err, fmt.Errorf("monitoring_interval cannot be zero"))
+	if c.DeviceMonitoringInterval == 0 {
+		err = multierr.Append(err, fmt.Errorf("device_monitoring_interval cannot be zero"))
+	}
+	if c.NetworkMonitoringInterval == 0 {
+		err = multierr.Append(err, fmt.Errorf("network_monitoring_interval cannot be zero"))
 	}
 	if c.FritzBox.BaseURL == "" {
 		err = multierr.Append(err, fmt.Errorf("FRITZ!Box base URL cannot be empty"))

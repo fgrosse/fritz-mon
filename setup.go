@@ -125,7 +125,7 @@ listenAddrStep:
 	conf.ListenAddr = listenAddr
 
 intervalStep:
-	answer := ask("At which interval should fritz-mon request metrics from the FRITZ!Box API?", conf.MonitoringInterval.String())
+	answer := ask("At which interval should fritz-mon request metrics from the FRITZ!Box API?", conf.DeviceMonitoringInterval.String())
 	fmt.Println("  Checking provided interval value... ")
 	interval, err := time.ParseDuration(answer)
 	if err != nil {
@@ -141,7 +141,7 @@ intervalStep:
 	}
 
 	fmt.Println("  ✔ The interval is valid and can be used")
-	conf.MonitoringInterval = interval
+	conf.DeviceMonitoringInterval = interval
 
 baseURLStep:
 	baseURL := ask("What is the URL of your FRITZ!Box", conf.FritzBox.BaseURL)

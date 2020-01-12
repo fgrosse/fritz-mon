@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sync"
 
 	"go.uber.org/zap"
 )
@@ -14,8 +15,10 @@ type Client struct {
 	Password string
 	BaseURL  url.URL // must not be a pointer to avoid modifying this URL during our requests
 
-	http    *http.Client
-	logger  *zap.Logger
+	http   *http.Client
+	logger *zap.Logger
+
+	mu      sync.Mutex
 	session Session
 }
 
@@ -60,14 +63,12 @@ func (c *Client) doXMLCommand(target interface{}, cmd string, args ...string) er
 }
 
 func (c *Client) prepareCommand(cmd string, args []string) ([]string, error) {
-	if c.session.SID == "" {
-		err := c.login()
-		if err != nil {
-			return nil, fmt.Errorf("authentication error: %w", err)
-		}
+	sessionID, err := c.getSession()
+	if err != nil {
+		return nil, err
 	}
 
-	return append(args, "sid", c.session.SID, "switchcmd", cmd), nil
+	return append(args, "sid", sessionID, "switchcmd", cmd), nil
 }
 
 func (c *Client) Close() error {

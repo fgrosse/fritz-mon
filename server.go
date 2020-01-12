@@ -6,10 +6,12 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/fgrosse/fritz-mon/fritzbox"
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
@@ -51,10 +53,13 @@ func (s *Server) Run() error {
 	s.Logger.Info("Starting FRITZ!Box monitoring server",
 		zap.String("listen_addr", s.Config.ListenAddr),
 		zap.String("fritzbox", s.Config.FritzBox.BaseURL),
-		zap.Duration("monitoring_interval", s.Config.MonitoringInterval),
 	)
 
-	s.Logger.Info("If you want to see more verbose log run with -debug")
+	if s.Logger.Check(zap.DebugLevel, "") == nil {
+		s.Logger.Info("If you want to see more verbose log run with -debug")
+	} else {
+		s.Logger.Debug("Debug logging is enabled")
+	}
 
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
@@ -64,63 +69,121 @@ func (s *Server) Run() error {
 		Handler: mux,
 	}
 
-	httpServerErr := make(chan error, 1)
+	ctx, shutdown := context.WithCancel(context.Background())
+
+	var serverErr error
 	go func() {
-		httpServerErr <- httpServer.ListenAndServe()
+		err := httpServer.ListenAndServe()
+		if err != http.ErrServerClosed {
+			serverErr = errors.Wrap(err, "HTTP server failed")
+		}
+		shutdown()
 	}()
 
-	ti := time.NewTicker(s.Config.MonitoringInterval)
-	defer ti.Stop()
-
-	// The first fetch should happen shortly after we started our HTTP server.
-	firstFetch := time.After(time.Second)
-
-	for {
+	go func() {
 		select {
-		case <-firstFetch:
-			firstFetch = nil // disable this case
-			err := s.Metrics.FetchFrom(s.FritzBox)
-			if err != nil {
-				s.Logger.Error("Failed to fetch metrics", zap.Error(err))
-			}
-
-		case <-ti.C:
-			err := s.Metrics.FetchFrom(s.FritzBox)
-			if err != nil {
-				s.Logger.Error("Failed to fetch metrics", zap.Error(err))
-			}
-
 		case sig := <-s.interrupt:
 			s.Logger.Info("Shutting down server due to system interrupt",
 				zap.Stringer("signal", sig),
 			)
+			shutdown()
+		case <-ctx.Done():
+			return
+		}
+	}()
 
-			err := s.FritzBox.Close()
-			if err != nil {
-				s.Logger.Error("Failed to close FRITZ!Box client", zap.Error(err))
+	s.CollectMetrics(ctx)
+
+	err := s.FritzBox.Close()
+	if err != nil {
+		s.Logger.Error("Failed to close FRITZ!Box client", zap.Error(err))
+	}
+
+	s.Logger.Info("HTTP Server is shutting down")
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	err = httpServer.Shutdown(ctx)
+	cancel() // make sure the context never leaks past this point
+	if err != nil {
+		s.Logger.Error("Failed to shutdown HTTP server gracefully", zap.Error(err))
+	}
+
+	return serverErr
+}
+
+func (s *Server) CollectMetrics(ctx context.Context) {
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+	go s.deviceMetricsLoop(ctx, wg, s.Config.DeviceMonitoringInterval)
+	go s.networkMetricsLoop(ctx, wg, s.Config.NetworkMonitoringInterval)
+	wg.Wait()
+}
+
+func newTicker(ctx context.Context, interval time.Duration) <-chan time.Time {
+	ch := make(chan time.Time, 1)
+	ch <- time.Now() // trigger first metrics collection immediately
+
+	go func() {
+		ti := time.NewTicker(interval)
+		defer ti.Stop()
+
+		for {
+			var next time.Time
+			select {
+			case next = <-ti.C:
+			case <-ctx.Done():
+				return
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-			err = httpServer.Shutdown(ctx)
-			cancel() // make sure the context never leaks past this point
+			select {
+			case ch <- next:
+				return
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	return ch
+}
+
+func (s *Server) deviceMetricsLoop(ctx context.Context, wg *sync.WaitGroup, interval time.Duration) {
+	s.Logger.Info("Monitoring device metrics", zap.Duration("interval", interval))
+
+	ticker := newTicker(ctx, interval)
+	for {
+		select {
+		case <-ticker:
+			err := s.Metrics.Devices.FetchFrom(s.FritzBox)
 			if err != nil {
-				s.Logger.Error("Failed to shutdown HTTP server gracefully", zap.Error(err))
+				s.Logger.Error("Failed to fetch device metrics", zap.Error(err))
 			}
 
-			return ErrServerClosed
+		case <-ctx.Done():
+			s.Logger.Info("Device monitoring stopped")
+			wg.Done()
+			return
+		}
+	}
+}
 
-		case serverErr := <-httpServerErr:
-			s.Logger.Error("HTTP server failed",
-				zap.Error(serverErr),
-				zap.String("listen_addr", s.Config.ListenAddr),
-			)
+func (s *Server) networkMetricsLoop(ctx context.Context, wg *sync.WaitGroup, interval time.Duration) {
+	s.Logger.Info("Monitoring network metrics", zap.Duration("interval", interval))
 
-			// Close everything just to be on the safe side. We don't care for
-			// any other errors at this point.
-			_ = httpServer.Close()
-			_ = s.FritzBox.Close()
+	ticker := newTicker(ctx, interval)
+	// TODO: actually we fetch the last 20 5 second buckets so we want to leverage that somehow
 
-			return serverErr
+	for {
+		select {
+		case <-ctx.Done():
+			s.Logger.Info("Network monitoring stopped")
+			wg.Done()
+			return
+
+		case <-ticker:
+			err := s.Metrics.Network.FetchFrom(s.FritzBox)
+			if err != nil {
+				s.Logger.Error("Failed to fetch network metrics", zap.Error(err))
+			}
 		}
 	}
 }

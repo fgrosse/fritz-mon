@@ -10,6 +10,11 @@ import (
 )
 
 type Metrics struct {
+	Devices *DeviceMetrics
+	Network *NetworkMetrics
+}
+
+type DeviceMetrics struct {
 	IsConnected *prometheus.GaugeVec
 	IsPoweredOn *prometheus.GaugeVec
 	Temperature *prometheus.GaugeVec
@@ -20,15 +25,35 @@ type Metrics struct {
 	logger *zap.Logger
 }
 
+type NetworkMetrics struct {
+	DownstreamInternet      prometheus.Gauge // ds_bps_curr
+	DownStreamMedia         prometheus.Gauge // ds_mc_bps_curr
+	DownStreamGuest         prometheus.Gauge // ds_guest_bps_curr
+	UpstreamRealtime        prometheus.Gauge // us_realtime_bps_curr
+	UpstreamHighPriority    prometheus.Gauge // us_important_bps_curr
+	UpstreamDefaultPriority prometheus.Gauge // us_default_bps_curr
+	UpstreamLowPriority     prometheus.Gauge // us_background_bps_curr
+	UpstreamGuest           prometheus.Gauge // guest_us_bps
+
+	logger *zap.Logger
+}
+
 func NewMetrics(logger *zap.Logger) *Metrics {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 
+	return &Metrics{
+		Devices: NewDeviceMetrics(logger),
+		Network: NewNetworkMetrics(logger),
+	}
+}
+
+func NewDeviceMetrics(logger *zap.Logger) *DeviceMetrics {
 	namespace := "fritzbox"
 	subsystem := "home_automation"
 	labelNames := []string{"device_name"}
-	return &Metrics{
+	return &DeviceMetrics{
 		logger: logger,
 		IsConnected: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -87,7 +112,92 @@ func NewMetrics(logger *zap.Logger) *Metrics {
 	}
 }
 
+func NewNetworkMetrics(logger *zap.Logger) *NetworkMetrics {
+	namespace := "fritzbox"
+	subsystem := "network"
+
+	return &NetworkMetrics{
+		logger: logger,
+		DownstreamInternet: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Subsystem: subsystem,
+				Name:      "downstream_inet_bps",
+				Help:      "Internet downstream in bits per second.",
+			},
+		),
+		DownStreamMedia: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Subsystem: subsystem,
+				Name:      "downstream_media_bps",
+				Help:      "Media downstream in bits per second.",
+			},
+		),
+		DownStreamGuest: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Subsystem: subsystem,
+				Name:      "downstream_guest_bps",
+				Help:      "Guest network downstream in bits per second.",
+			},
+		),
+		UpstreamRealtime: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Subsystem: subsystem,
+				Name:      "upstream_realtime_bps",
+				Help:      "Realtime priority upstream in bits per second.",
+			},
+		),
+		UpstreamHighPriority: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Subsystem: subsystem,
+				Name:      "upstream_important_bps",
+				Help:      "High priority upstream in bits per second.",
+			},
+		),
+		UpstreamDefaultPriority: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Subsystem: subsystem,
+				Name:      "upstream_default_bps",
+				Help:      "Default priority upstream in bits per second.",
+			},
+		),
+		UpstreamLowPriority: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Subsystem: subsystem,
+				Name:      "upstream_background_bps",
+				Help:      "Low priority upstream in bits per second.",
+			},
+		),
+		UpstreamGuest: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Subsystem: subsystem,
+				Name:      "upstream_guest_bps",
+				Help:      "Guest network upstream in bits per second.",
+			},
+		),
+	}
+}
+
 func (m *Metrics) Register(r prometheus.Registerer) error {
+	if err := m.Devices.Register(r); err != nil {
+		return err
+	}
+
+	if err := m.Network.Register(r); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *DeviceMetrics) Register(r prometheus.Registerer) error {
 	metrics := []prometheus.Collector{
 		m.IsPoweredOn,
 		m.IsConnected,
@@ -106,8 +216,29 @@ func (m *Metrics) Register(r prometheus.Registerer) error {
 	return nil
 }
 
-func (m *Metrics) FetchFrom(client *fritzbox.Client) error {
-	m.logger.Debug("Fetching metrics from FRITZ!Box API")
+func (m *NetworkMetrics) Register(r prometheus.Registerer) error {
+	metrics := []prometheus.Collector{
+		m.DownstreamInternet,
+		m.DownStreamMedia,
+		m.DownStreamGuest,
+		m.UpstreamRealtime,
+		m.UpstreamHighPriority,
+		m.UpstreamDefaultPriority,
+		m.UpstreamLowPriority,
+		m.UpstreamGuest,
+	}
+
+	for _, metric := range metrics {
+		if err := r.Register(metric); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *DeviceMetrics) FetchFrom(client *fritzbox.Client) error {
+	m.logger.Debug("Fetching device metrics from FRITZ!Box API")
 
 	devices, err := client.Devices()
 	if err != nil {
@@ -121,7 +252,7 @@ func (m *Metrics) FetchFrom(client *fritzbox.Client) error {
 	return nil
 }
 
-func (m *Metrics) collectDeviceMetrics(device fritzbox.Device) {
+func (m *DeviceMetrics) collectDeviceMetrics(device fritzbox.Device) {
 	collectedMetrics := map[string]float64{}
 	m.IsConnected.WithLabelValues(device.Name).Set(float64(device.Present))
 	collectedMetrics["is_connected"] = float64(device.Present)
@@ -155,6 +286,27 @@ func (m *Metrics) collectDeviceMetrics(device fritzbox.Device) {
 
 	logFields := metricsToLogFields(device.Name, collectedMetrics)
 	m.logger.Debug("Collected device metrics", logFields...)
+}
+
+func (m *NetworkMetrics) FetchFrom(client *fritzbox.Client) error {
+	m.logger.Debug("Fetching network metrics from FRITZ!Box API")
+
+	stats, err := client.NetworkStats()
+	if err != nil {
+		return err
+	}
+
+	m.DownstreamInternet.Set(stats.DownstreamInternet[0])
+	m.DownStreamMedia.Set(stats.DownStreamMedia[0])
+	m.DownStreamGuest.Set(stats.DownStreamGuest[0])
+	m.UpstreamRealtime.Set(stats.UpstreamRealtime[0])
+	m.UpstreamHighPriority.Set(stats.UpstreamHighPriority[0])
+	m.UpstreamDefaultPriority.Set(stats.UpstreamDefaultPriority[0])
+	m.UpstreamLowPriority.Set(stats.UpstreamLowPriority[0])
+	m.UpstreamGuest.Set(stats.UpstreamGuest[0])
+
+	m.logger.Debug("Collected internet metrics")
+	return nil
 }
 
 func prometheusBool(value bool) float64 {
