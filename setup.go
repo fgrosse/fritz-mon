@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -177,7 +178,8 @@ usernameStep:
 		os.Exit(1)
 	}
 
-	devices, err := client.Devices()
+	ctx := context.Background()
+	devices, err := client.Devices(ctx)
 	if err != nil {
 		fmt.Println("  ✘ Failed to list devices")
 		fmt.Println("    " + err.Error())

@@ -130,13 +130,14 @@ func newTicker(ctx context.Context, interval time.Duration) <-chan time.Time {
 			var next time.Time
 			select {
 			case next = <-ti.C:
+				// we got an update
 			case <-ctx.Done():
 				return
 			}
 
 			select {
 			case ch <- next:
-				return
+				// cool, keep on going
 			case <-ctx.Done():
 				return
 			}
@@ -170,7 +171,6 @@ func (s *Server) networkMetricsLoop(ctx context.Context, wg *sync.WaitGroup, int
 	s.Logger.Info("Monitoring network metrics", zap.Duration("interval", interval))
 
 	ticker := newTicker(ctx, interval)
-	// TODO: actually we fetch the last 20 5 second buckets so we want to leverage that somehow
 
 	for {
 		select {

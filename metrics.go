@@ -239,8 +239,6 @@ func (m *NetworkMetrics) Register(r prometheus.Registerer) error {
 }
 
 func (m *DeviceMetrics) FetchFrom(ctx context.Context, client *fritzbox.Client) error {
-	m.logger.Debug("Fetching device metrics from FRITZ!Box API")
-
 	devices, err := client.Devices(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to fetch devices from the FRITZ!Box API: %w", err)
@@ -290,8 +288,6 @@ func (m *DeviceMetrics) collectDeviceMetrics(device fritzbox.Device) {
 }
 
 func (m *NetworkMetrics) FetchFrom(ctx context.Context, client *fritzbox.Client) error {
-	m.logger.Debug("Fetching network metrics from FRITZ!Box API")
-
 	stats, err := client.NetworkStats(ctx)
 	if err != nil {
 		return err
@@ -306,7 +302,7 @@ func (m *NetworkMetrics) FetchFrom(ctx context.Context, client *fritzbox.Client)
 	m.UpstreamLowPriority.Set(stats.UpstreamLowPriority[0])
 	m.UpstreamGuest.Set(stats.UpstreamGuest[0])
 
-	m.logger.Debug("Collected internet metrics")
+	m.logger.Debug("Collected network metrics")
 	return nil
 }
 

@@ -51,7 +51,7 @@ func DefaultConfig() Config {
 	var conf Config
 	conf.ListenAddr = "0:0:0:0:3000"
 	conf.DeviceMonitoringInterval = 5 * time.Minute
-	conf.NetworkMonitoringInterval = 100 * time.Second // Fritzbox returns the values of the last 100 seconds in 20 buckets of 5 seconds
+	conf.NetworkMonitoringInterval = 10 * time.Second
 	conf.FritzBox.BaseURL = "http://fritz.box"
 	return conf
 }
