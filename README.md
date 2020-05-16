@@ -1,6 +1,6 @@
 # fritz-mon
 
-[![Build Status](https://secure.travis-ci.org/fgrosse/fritz-mon.png?branch=master)](http://travis-ci.org/fgrosse/fritz-mon)
+![Build Status](https://github.com/fgrosse/fritz-mon/workflows/Build/badge.svg)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](https://github.com/fgrosse/fritz-mon/blob/master/LICENSE)
 
 Export various metrics from the AVM FRITZ!Box API as Prometheus metric.
